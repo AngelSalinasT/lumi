@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Lumi Family",
+    "slug": "lumi-family",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "lumi-family",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F8F5FF"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.angelsalinas.lumifamily",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Lumi Family necesita la camara para escanear el codigo QR del dispositivo Lumi",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
+      },
+      "entitlements": {}
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F8F5FF"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.lumi.family"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Lumi Family necesita la camara para escanear el QR de Lumi"
+        }
+      ]
+    ]
+  }
+}
