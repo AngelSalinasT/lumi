@@ -1,157 +1,224 @@
-# Companion AI — Hackathon Troyano 2026
-> Agente de IA como compañero para adultos mayores
-> FIF UAQ · 17-18 de Abril, 2026 · Centro de Negocios UAQ
+<p align="center">
+  <img src="lumi-preview-final.png" alt="Lumi" width="600"/>
+</p>
+
+<h1 align="center">Lumi</h1>
+<p align="center">
+  <strong>AI Companion for Elderly — Because no one should age alone.</strong>
+</p>
+
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#tech-stack">Tech Stack</a> •
+  <a href="#project-structure">Structure</a> •
+  <a href="#getting-started">Getting Started</a> •
+  <a href="#team">Team</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Hackathon-Troyano%202026-orange" alt="Hackathon Troyano 2026"/>
+  <img src="https://img.shields.io/badge/MLH-Member%20Event-blue" alt="MLH"/>
+  <img src="https://img.shields.io/badge/Gemini-2.5%20Pro-4285F4" alt="Gemini"/>
+  <img src="https://img.shields.io/badge/ElevenLabs-TTS-black" alt="ElevenLabs"/>
+  <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248" alt="MongoDB Atlas"/>
+</p>
 
 ---
 
-## Idea central
+## The Problem
 
-Un dispositivo físico (M5GO) con un agente conversacional de IA que acompaña a adultos mayores mediante voz natural. El agente recuerda el nombre del usuario, sus medicamentos y su familia, detecta caídas y puede alertar a familiares en caso de emergencia.
+In Mexico, **over 40% of elderly adults experience loneliness daily**. Their families — busy with work, school, and responsibilities — can't be there 24/7. Social circles shrink, physical limitations grow, and the conversations that once filled their days disappear.
 
-**El adulto mayor no necesita celular ni computadora — solo presiona un botón y habla.**
+**Lumi changes that.** A physical AI companion that sits in their home, talks naturally, remembers their stories, and watches over them — alerting the family when something goes wrong.
 
----
-
-## Stack tecnológico
-
-| Capa | Tecnología | Rol |
-|------|-----------|-----|
-| Hardware | **M5GO (ESP32)** | Dispositivo físico — micrófono, parlante, pantalla, botones |
-| LLM / Cerebro | **Gemini API** | Procesa mensajes, mantiene contexto, genera respuestas |
-| Voz sintética | **ElevenLabs API** | Convierte respuestas de texto a voz natural en español |
-| Speech-to-Text | Gemini Audio / Whisper | Convierte voz del usuario a texto |
-| Memoria | **MongoDB Atlas** | Persiste perfil del usuario: nombre, medicamentos, familia |
-| Alertas | EmailJS / Twilio | Notifica a familiar en emergencia o caída |
-
-> Gemini, ElevenLabs y MongoDB Atlas son patrocinadores oficiales del hackathon — usar sus APIs suma puntos para premios adicionales.
+> The elderly person doesn't need a phone or computer. They just press a button and talk.
 
 ---
 
-## Arquitectura del flujo
+## Features
+
+### Conversational AI
+- Natural voice conversations in Spanish
+- Remembers the user's name, interests, favorite music, stories
+- Proactively initiates topics based on their preferences
+- Powered by Gemini 2.5 Pro with long-term memory
+
+### Health & Safety
+- **Fall detection** — 3-phase algorithm (freefall + impact + gyroscope confirmation)
+- **Medication reminders** — Timely, gentle voice reminders
+- **Emergency button** — Instant alert to family
+- **Real-time alerts** — Via mobile app, Telegram, and WhatsApp
+
+### Family App
+- Live dashboard with activity status
+- Conversation history
+- Medication tracking
+- Alert management
+- Onboarding wizard to configure Lumi
+
+### Hardware
+- M5Stack M5GO (ESP32) with animated eyes on screen
+- Built-in microphone, speaker, IMU sensors
+- LED indicators (green = listening, red = processing)
+- Physical buttons: A (talk), B (repeat), C (emergency)
+
+---
+
+## Architecture
 
 ```
-Usuario habla
-     │
-     ▼
-M5GO graba audio con micrófono
-     │
-     ▼
-Audio → Speech-to-Text → texto
-     │
-     ▼
-Gemini API (contexto + perfil en MongoDB)
-     │
-     ▼
-Respuesta en texto
-     │
-     ▼
-ElevenLabs API → audio MP3
-     │
-     ▼
-M5GO reproduce respuesta por parlante
+  Elderly Person                    Family
+       |                              |
+  [Press Button]               [Mobile App - iOS]
+       |                              |
+  [M5GO ESP32]                        |
+  - Record audio                      |
+  - Fall detection          [HTTPS - Caddy Proxy]
+  - LED feedback                      |
+       |                     [DigitalOcean Droplet]
+       |                              |
+  [WiFi - HTTP]              [FastAPI + LangGraph]
+       |                      /       |       \
+       +---------------------+       |        \
+                             |        |         \
+                      [Gemini 2.5]  [Redis]  [ElevenLabs]
+                        STT + LLM   Cache      TTS
+                             |
+                      [MongoDB Atlas]
+                    Users, Conversations,
+                    Medications, Alerts
 ```
 
 ---
 
-## Features del MVP (48 horas)
+## Tech Stack
 
-### Core
-- [ ] Conversación natural por voz en español
-- [ ] Memoria de la sesión (nombre, gustos, familia)
-- [ ] Recordatorios de medicamentos
-- [ ] Cara animada en la pantalla LCD del M5GO
-
-### Seguridad
-- [ ] Detección de caídas con acelerómetro del M5GO
-- [ ] Botón físico de emergencia (botón C)
-- [ ] Alerta automática a familiar por email/SMS
-
-### UX
-- [ ] Botón A → iniciar conversación
-- [ ] Botón B → repetir último mensaje
-- [ ] Botón C → emergencia
-- [ ] LED verde = escuchando / rojo = procesando
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| **Hardware** | M5Stack M5GO (ESP32) | Physical device — mic, speaker, screen, IMU |
+| **AI / LLM** | Google Gemini 2.5 Pro | Conversation, reasoning, speech-to-text |
+| **Voice** | ElevenLabs | Natural text-to-speech (Lily voice) |
+| **Agent Framework** | LangGraph | Stateful conversation agent with tools |
+| **Backend** | FastAPI + Uvicorn | REST API |
+| **Database** | MongoDB Atlas | User profiles, conversations, alerts |
+| **Cache** | Redis | Conversation history cache |
+| **Mobile App** | React Native + Expo Router | Family monitoring app (iOS) |
+| **Cloud** | DigitalOcean | Droplet hosting |
+| **HTTPS** | Caddy | Automatic TLS certificates |
+| **Alerts** | Telegram Bot API | Real-time family notifications |
 
 ---
 
-## Estructura del proyecto
+## Project Structure
 
 ```
-hackathon2026/
+lumi/
 ├── src/
-│   ├── agent/          # Lógica del agente Gemini (contexto, memoria)
-│   ├── voice/          # Integración ElevenLabs + Speech-to-Text
-│   ├── ui/             # Pantalla LCD M5GO + animaciones
-│   └── hardware/       # Código MicroPython para M5GO
-├── docs/               # Documentación técnica y arquitectura
-├── assets/             # Imágenes, iconos, recursos
-└── README.md
+│   ├── backend/              # FastAPI + LangGraph backend
+│   │   ├── graph/            # LangGraph agent (nodes, tools, builder)
+│   │   ├── services/         # MongoDB, Redis, TTS, medications, alerts
+│   │   ├── prompts/          # Lumi's personality prompt
+│   │   ├── config.py         # Environment configuration
+│   │   └── main.py           # API endpoints
+│   │
+│   ├── app/                  # React Native / Expo mobile app
+│   │   ├── app/              # Expo Router screens
+│   │   │   ├── (tabs)/       # Main tabs (home, activity, family, meds)
+│   │   │   └── (onboarding)/ # Setup wizard
+│   │   ├── components/       # Reusable UI components
+│   │   └── lib/              # API client, theme, utilities
+│   │
+│   └── firmware/             # ESP32 / M5GO firmware (C++)
+│       ├── src/              # Main code (audio, network, IMU, LEDs)
+│       └── include/          # Headers and configuration
+│
+└── docs/                     # Documentation
 ```
 
 ---
 
-## Plan de 48 horas
+## Getting Started
 
-### Día 1 — 17 de Abril
-| Hora | Tarea |
-|------|-------|
-| 10:00 - 12:00 | Setup: APIs, M5GO WiFi, repo GitHub |
-| 12:00 - 15:00 | Conectar Gemini + contexto básico de conversación |
-| 15:00 - 18:00 | Integrar ElevenLabs → reproducir audio en M5GO |
-| 18:00 - 21:00 | Botones + pantalla LCD + cara animada |
-| 21:00 - 23:00 | MongoDB Atlas: perfil de usuario persistente |
+### Prerequisites
 
-### Día 2 — 18 de Abril
-| Hora | Tarea |
-|------|-------|
-| 09:00 - 11:00 | Detección de caídas + botón de emergencia |
-| 11:00 - 13:00 | Alertas a familiar (email/SMS) |
-| 13:00 - 14:00 | Pruebas, bugs, pulir demo |
-| 14:00 - 14:45 | Grabar video de 4 minutos y subir a YouTube |
+- Python 3.11+
+- Node.js 18+
+- PlatformIO (for firmware)
+- Xcode (for iOS builds)
+- M5Stack M5GO device
 
----
+### Backend
 
-## Criterios de evaluación (jurado)
+```bash
+cd src/backend
+python -m venv .venv && source .venv/bin/activate
+pip install -e .
+cp .env.example .env  # Configure your API keys
+python main.py
+```
 
-| Criterio | Como lo cubrimos |
-|----------|-----------------|
-| Importancia del problema | Soledad y aislamiento en adultos mayores — problema real y medible |
-| Creatividad e innovación | Hardware físico + IA conversacional + detección de caídas |
-| Avance de implementación | Demo funcional corriendo en M5GO real |
-| Mérito técnico | Gemini + ElevenLabs + MongoDB + ESP32 integrados |
+### Mobile App
 
----
+```bash
+cd src/app
+npm install
+npx expo start
+```
 
-## Video demo (max 4 min) — guión sugerido
+### Firmware
 
-1. **0:00 - 0:30** — Problema: datos de soledad en adultos mayores en México
-2. **0:30 - 1:30** — Demo en vivo: conversación con el M5GO
-3. **1:30 - 2:30** — Demo: recordatorio de medicamento + cara animada
-4. **2:30 - 3:30** — Demo: simulación de caída → alerta al familiar
-5. **3:30 - 4:00** — Arquitectura técnica y stack usado
+```bash
+cd src/firmware
+# Edit include/config.h with your WiFi and backend URL
+pio run -t upload
+```
 
----
+### Environment Variables
 
-## Equipo
-
-| Nombre | Rol |
-|--------|-----|
-| | |
-| | |
-| | |
-| | |
+```env
+GEMINI_API_KEY=your_gemini_key
+GEMINI_MODEL=gemini-2.5-pro
+ELEVENLABS_API_KEY=your_elevenlabs_key
+ELEVENLABS_VOICE_ID=pFZP5JQG7iQjIQuC4Bku
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/companion
+TELEGRAM_BOT_TOKEN=your_telegram_bot
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
+```
 
 ---
 
-## Recursos
+## MLH Prize Tracks
 
-- [Sitio oficial Hackathon Troyano 2026](https://hackathon.fif-uaq.mx)
-- [Gemini API Docs](https://ai.google.dev/docs)
-- [ElevenLabs API Docs](https://elevenlabs.io/docs)
-- [MongoDB Atlas](https://www.mongodb.com/atlas)
-- [M5GO Docs](https://docs.m5stack.com/en/core/m5go)
-- [M5Stack MicroPython](https://github.com/m5stack/UIFlow-MicroPython)
+| Track | How we use it |
+|-------|--------------|
+| **Best Use of ElevenLabs** | Natural voice synthesis for Lumi's responses |
+| **Best Use of Gemini API** | Conversational AI + speech-to-text |
+| **Best Use of MongoDB Atlas** | Cloud database for users, conversations, alerts |
+| **Best Use of DigitalOcean** | Backend deployed on Droplet with HTTPS |
 
 ---
 
-*Hackathon Troyano 2026 — FIF UAQ · Tema: Open Innovation Challenge: IA para Impacto en el Mundo Real*
+## Team
+
+| Name | Role |
+|------|------|
+| **Jose Angel Salinas Terrazas** | Lead Developer & AI Engineer |
+| **Danielle Sebastian Rivera Perez** | Hardware & Research (Fall Detection) |
+| **Jorge Luis Ramirez Ramirez** | Frontend & Animations (Lumi's Eyes) |
+| **Angel Moises Morales Consuelo** | QA & Testing |
+| **Luis Julian Olalde Abarca** | Bug Fixing & Integration |
+
+---
+
+## License
+
+This project was built during **Hackathon Troyano 2026** at Universidad Autonoma de Queretaro (UAQ). All intellectual property belongs to the team members.
+
+---
+
+<p align="center">
+  <strong>Hackathon Troyano 2026</strong> — FIF UAQ<br/>
+  <em>AI for Real-World Impact</em>
+</p>

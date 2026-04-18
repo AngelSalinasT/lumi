@@ -30,3 +30,13 @@ Thumbs.db
 # Temp
 /tmp/
 .playwright-mcp/
+
+# Internal docs
+BUILD_IOS.md
+docs/lineamientos-hackathon.md
+docs/LUMI-OVERVIEW.md
+docs/SETUP.md
+docs/analisis-hackathon.*
+docs/m5go-hardware-reference.md
+docs/M5GO_v2.7_documentation.pdf
+docs/investigacion-adultos-mayores.typ
