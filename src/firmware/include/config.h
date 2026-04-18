@@ -2,17 +2,17 @@
 #define CONFIG_H
 
 // --- WiFi ---
-#define WIFI_SSID     "Totalplay-3C9F"
-#define WIFI_PASSWORD "3C9FA0A6my3NTs2Q"
+#define WIFI_SSID     "iPhone_de_Angel"
+#define WIFI_PASSWORD "Hola123456789"
 
 // --- Backend ---
-#define BACKEND_URL   "http://192.168.100.99:8000"
+#define BACKEND_URL   "http://164.92.127.153:8000"
 #define DEVICE_ID     "m5go_001"
 
 // --- Audio Recording ---
 #define SAMPLE_RATE   8000
 #define SAMPLE_BITS   16
-#define RECORD_SECONDS 4
+#define RECORD_SECONDS 15
 #define MIC_PIN       34
 
 // Buffer: 8000 Hz × 2 bytes × 6 seg = 96KB

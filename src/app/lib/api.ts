@@ -1,35 +1,10 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import Constants from "expo-constants";
+const BASE_URL = "https://164-92-127-153.nip.io";
 
-const DEFAULT_IP = "192.168.0.14";
-const BACKEND_IP_KEY = "@lumi:backend_ip";
-
-let _cachedBaseUrl: string | null = null;
-
-async function getBaseUrl(): Promise<string> {
-  if (_cachedBaseUrl) return _cachedBaseUrl;
-  if (!Constants.isDevice) {
-    _cachedBaseUrl = "http://localhost:8000";
-    return _cachedBaseUrl;
-  }
-  const savedIp = await AsyncStorage.getItem(BACKEND_IP_KEY);
-  _cachedBaseUrl = `http://${savedIp || DEFAULT_IP}:8000`;
-  return _cachedBaseUrl;
-}
-
-export async function setBackendIp(ip: string): Promise<void> {
-  await AsyncStorage.setItem(BACKEND_IP_KEY, ip);
-  _cachedBaseUrl = `http://${ip}:8000`;
-}
-
-export async function getBackendIp(): Promise<string> {
-  const saved = await AsyncStorage.getItem(BACKEND_IP_KEY);
-  return saved || DEFAULT_IP;
-}
-
+export function setBackendIp(_ip: string): void {}
+export function getBackendIp(): string { return "164-92-127-153.nip.io"; }
 export async function testConnection(ip: string): Promise<boolean> {
   try {
-    const res = await fetch(`http://${ip}:8000/health`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`https://${ip}/health`, { signal: AbortSignal.timeout(3000) });
     return res.ok;
   } catch {
     return false;
@@ -40,8 +15,7 @@ export async function testConnection(ip: string): Promise<boolean> {
 export const DEVICE_ID = "m5go_001";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const base = await getBaseUrl();
-  const res = await fetch(`${base}${path}`, {
+  const res = await fetch(`${BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...options,
   });

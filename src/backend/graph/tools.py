@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+import httpx
 from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,43 @@ def confirm_medication(medication_name: str, taken: bool) -> str:
     return f"Registrado: {medication_name} {status}"
 
 
+@tool
+def web_search(query: str) -> str:
+    """Busca información actual en internet.
+    Usa esto SOLO para noticias de HOY, resultados deportivos de HOY, o clima actual.
+    NO la uses para datos históricos, culturales o generales — esos ya los sabes.
+    Args:
+        query: Lo que quieres buscar (ej: "Cruz Azul resultado hoy", "clima Querétaro hoy")
+    """
+    try:
+        r = httpx.get(
+            "https://lite.duckduckgo.com/lite",
+            params={"q": query, "kl": "mx-es"},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=5,
+        )
+        # Extraer snippets del HTML lite
+        from html.parser import HTMLParser
+        snippets = []
+        class P(HTMLParser):
+            in_snippet = False
+            def handle_starttag(self, tag, attrs):
+                if tag == "td" and ("class", "result-snippet") in attrs:
+                    self.in_snippet = True
+            def handle_data(self, data):
+                if self.in_snippet:
+                    snippets.append(data.strip())
+                    self.in_snippet = False
+        P().feed(r.text)
+        if snippets:
+            logger.info("Web search: %s -> %d resultados", query, len(snippets))
+            return "\n".join(f"- {s}" for s in snippets[:3])
+        return "No encontré resultados actuales."
+    except Exception as e:
+        logger.error("Error en web search: %s", e)
+        return "No pude buscar en internet en este momento."
+
+
 companion_tools = [
     get_time,
     medication_reminder,
@@ -82,6 +120,7 @@ companion_tools = [
     save_user_info,
     save_family_contact,
     confirm_medication,
+    web_search,
 ]
 
 # Mapa de tools por nombre para ejecución directa (patrón agentcode-med)

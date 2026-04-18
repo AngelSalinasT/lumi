@@ -53,7 +53,17 @@ uint8_t* send_chat_audio(const uint8_t* wav_data, size_t wav_size, size_t* respo
     return nullptr;
   }
 
-  // Multipart por streaming (sin buffer extra)
+  // Leer WAV desde SD
+  File wavFile = SD.open("/recording.wav", FILE_READ);
+  if (!wavFile) {
+    Serial.println("Error abriendo WAV de SD");
+    client.stop();
+    *response_size = 0;
+    return nullptr;
+  }
+  size_t fileSize = wavFile.size();
+
+  // Multipart por streaming
   String boundary = "----Companion";
   String partHeader =
     "--" + boundary + "\r\n"
@@ -64,7 +74,7 @@ uint8_t* send_chat_audio(const uint8_t* wav_data, size_t wav_size, size_t* respo
     "Content-Type: audio/wav\r\n\r\n";
   String partFooter = "\r\n--" + boundary + "--\r\n";
 
-  size_t contentLength = partHeader.length() + wav_size + partFooter.length();
+  size_t contentLength = partHeader.length() + fileSize + partFooter.length();
 
   // HTTP headers
   client.printf("POST /chat HTTP/1.1\r\n");
@@ -73,22 +83,31 @@ uint8_t* send_chat_audio(const uint8_t* wav_data, size_t wav_size, size_t* respo
   client.printf("Content-Length: %d\r\n", contentLength);
   client.printf("Connection: close\r\n\r\n");
 
-  // Body en streaming
+  // Body en streaming desde SD
   client.print(partHeader);
 
+  uint8_t sdBuf[512];
   size_t sent = 0;
-  while (sent < wav_size) {
-    size_t chunk = (wav_size - sent > 512) ? 512 : (wav_size - sent);
-    size_t written = client.write(wav_data + sent, chunk);
+  while (sent < fileSize) {
+    size_t chunk = (fileSize - sent > 512) ? 512 : (fileSize - sent);
+    size_t got = wavFile.read(sdBuf, chunk);
+    int retries = 0;
+    size_t written = 0;
+    while (written == 0 && retries < 5) {
+      written = client.write(sdBuf, got);
+      if (written == 0) { retries++; delay(50); }
+    }
     if (written == 0) {
-      Serial.println("Error escribiendo datos");
+      Serial.printf("Error escribiendo datos (sent %d/%d)\n", sent, fileSize);
+      wavFile.close();
       client.stop();
       *response_size = 0;
       return nullptr;
     }
     sent += written;
-    delay(1);  // Dar tiempo al stack TCP
+    delay(1);
   }
+  wavFile.close();
 
   client.print(partFooter);
   client.flush();
@@ -179,6 +198,57 @@ int check_device_status() {
   if (payload.indexOf("\"ready\"") > 0) return 2;
   if (payload.indexOf("\"onboarding\"") > 0) return 1;
   return 0;
+}
+
+
+bool check_notifications(size_t* audio_size) {
+  HTTPClient http;
+  String url = String(BACKEND_URL) + "/notifications/" + String(DEVICE_ID);
+  http.begin(url);
+  http.setTimeout(5000);
+  int httpCode = http.GET();
+
+  if (httpCode != 200) {
+    http.end();
+    *audio_size = 0;
+    return false;
+  }
+
+  int contentLen = http.getSize();
+  if (contentLen <= 0) {
+    http.end();
+    *audio_size = 0;
+    return false;
+  }
+
+  // Guardar audio en SD
+  WiFiClient* stream = http.getStreamPtr();
+  File mp3File = SD.open(MP3_FILE_PATH, FILE_WRITE);
+  if (!mp3File) {
+    http.end();
+    *audio_size = 0;
+    return false;
+  }
+
+  uint8_t buf[512];
+  size_t received = 0;
+  while (received < (size_t)contentLen) {
+    size_t avail = stream->available();
+    if (avail) {
+      size_t toRead = (avail > 512) ? 512 : avail;
+      size_t got = stream->read(buf, toRead);
+      mp3File.write(buf, got);
+      received += got;
+    } else {
+      delay(10);
+    }
+  }
+
+  mp3File.close();
+  http.end();
+  Serial.printf("Notificación recibida: %d bytes\n", received);
+  *audio_size = received;
+  return true;
 }
 
 

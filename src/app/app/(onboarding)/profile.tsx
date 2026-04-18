@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableWithoutFeedback, View } from "react-native";
 import Animated, { FadeIn, FadeInUp } from "react-native-reanimated";
 import { router } from "expo-router";
 import { useOnboarding } from "../../lib/onboarding-context";
@@ -11,8 +11,9 @@ export default function ProfileScreen() {
   const canContinue = data.elderlyName.trim().length > 0;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.top}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView style={styles.top} keyboardShouldPersistTaps="handled">
         {/* Progress dots */}
         <Animated.View entering={FadeIn.delay(100)} style={styles.dots}>
           <View style={styles.dot} />
@@ -54,6 +55,7 @@ export default function ProfileScreen() {
               placeholderTextColor={colors.fog}
               value={data.elderlyName}
               onChangeText={(v) => updateData({ elderlyName: v })}
+              returnKeyType="done"
               autoFocus
             />
           </View>
@@ -66,12 +68,13 @@ export default function ProfileScreen() {
               placeholderTextColor={colors.fog}
               value={data.elderlyAge}
               onChangeText={(v) => updateData({ elderlyAge: v })}
+              returnKeyType="done"
               keyboardType="number-pad"
               maxLength={3}
             />
           </View>
         </Animated.View>
-      </View>
+      </ScrollView>
 
       <View style={styles.bottom}>
         <View style={styles.buttonRow}>
@@ -88,7 +91,8 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 

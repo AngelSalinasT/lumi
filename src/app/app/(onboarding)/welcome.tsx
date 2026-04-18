@@ -42,7 +42,7 @@ export default function WelcomeScreen() {
       <Animated.View entering={FadeInDown.delay(1000).duration(500)} style={styles.bottom}>
         <Pressable
           style={styles.primaryBtn}
-          onPress={() => router.push("/(onboarding)/wifi")}
+          onPress={() => router.push("/(onboarding)/profile")}
         >
           <Text style={styles.primaryBtnText}>Comenzar</Text>
         </Pressable>

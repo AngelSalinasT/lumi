@@ -41,25 +41,37 @@ static const int16_t ulaw_table[256] = {
   56,48,40,32,24,16,8,0
 };
 
-// --- Grabación ---
-static uint8_t wavBuffer[WAV_HEADER_SIZE + (SAMPLE_RATE * RECORD_SECONDS * 2)];
-static int16_t* sampleBuffer = (int16_t*)(wavBuffer + WAV_HEADER_SIZE);
-static volatile uint32_t sampleIndex = 0;
+// --- Grabación a SD ---
+#define REC_FILE_PATH "/recording.wav"
+#define REC_BUF_SAMPLES 512
+static int16_t recBuf[REC_BUF_SAMPLES];
+static volatile uint32_t recBufPos = 0;
+static volatile uint32_t totalSamples = 0;
 static volatile bool recording = false;
+static volatile bool recBufReady = false;
+static int16_t flushBuf[REC_BUF_SAMPLES];
 static const uint32_t maxSamples = SAMPLE_RATE * RECORD_SECONDS;
 
 static hw_timer_t* sampleTimer = NULL;
 
 static void IRAM_ATTR onSampleTimer() {
-  if (!recording || sampleIndex >= maxSamples) {
+  if (!recording || totalSamples >= maxSamples) {
     recording = false;
     return;
   }
   int raw = adc1_get_raw(ADC1_CHANNEL_6);
-  sampleBuffer[sampleIndex++] = (int16_t)((raw - 2048) * 16);
+  recBuf[recBufPos] = (int16_t)((raw - 2048) * 16);
+  recBufPos++;
+  totalSamples++;
+
+  if (recBufPos >= REC_BUF_SAMPLES) {
+    recBufReady = true;
+    recBufPos = 0;
+  }
 }
 
-static void write_wav_header(uint8_t* buf, uint32_t data_size) {
+static void write_wav_header_to_file(File &f, uint32_t data_size) {
+  uint8_t hdr[WAV_HEADER_SIZE];
   uint32_t file_size = data_size + WAV_HEADER_SIZE - 8;
   uint16_t channels = 1;
   uint16_t bits = SAMPLE_BITS;
@@ -67,21 +79,24 @@ static void write_wav_header(uint8_t* buf, uint32_t data_size) {
   uint32_t byte_rate = rate * channels * (bits / 8);
   uint16_t block_align = channels * (bits / 8);
 
-  memcpy(buf, "RIFF", 4);
-  memcpy(buf + 4, &file_size, 4);
-  memcpy(buf + 8, "WAVE", 4);
-  memcpy(buf + 12, "fmt ", 4);
+  memcpy(hdr, "RIFF", 4);
+  memcpy(hdr + 4, &file_size, 4);
+  memcpy(hdr + 8, "WAVE", 4);
+  memcpy(hdr + 12, "fmt ", 4);
   uint32_t fmt_size = 16;
-  memcpy(buf + 16, &fmt_size, 4);
+  memcpy(hdr + 16, &fmt_size, 4);
   uint16_t audio_format = 1;
-  memcpy(buf + 20, &audio_format, 2);
-  memcpy(buf + 22, &channels, 2);
-  memcpy(buf + 24, &rate, 4);
-  memcpy(buf + 28, &byte_rate, 4);
-  memcpy(buf + 32, &block_align, 2);
-  memcpy(buf + 34, &bits, 2);
-  memcpy(buf + 36, "data", 4);
-  memcpy(buf + 40, &data_size, 4);
+  memcpy(hdr + 20, &audio_format, 2);
+  memcpy(hdr + 22, &channels, 2);
+  memcpy(hdr + 24, &rate, 4);
+  memcpy(hdr + 28, &byte_rate, 4);
+  memcpy(hdr + 32, &block_align, 2);
+  memcpy(hdr + 34, &bits, 2);
+  memcpy(hdr + 36, "data", 4);
+  memcpy(hdr + 40, &data_size, 4);
+
+  f.seek(0);
+  f.write(hdr, WAV_HEADER_SIZE);
 }
 
 void audio_init() {
@@ -90,9 +105,21 @@ void audio_init() {
   Serial.printf("Audio init OK, heap: %d\n", ESP.getFreeHeap());
 }
 
-// --- Push-to-talk: iniciar grabación ---
+static File recFile;
+
 void audio_start_recording() {
-  sampleIndex = 0;
+  recFile = SD.open(REC_FILE_PATH, FILE_WRITE);
+  if (!recFile) {
+    Serial.println("Error abriendo SD para grabar");
+    return;
+  }
+  // Escribir header placeholder (se actualiza al final)
+  uint8_t zeros[WAV_HEADER_SIZE] = {0};
+  recFile.write(zeros, WAV_HEADER_SIZE);
+
+  recBufPos = 0;
+  totalSamples = 0;
+  recBufReady = false;
   recording = true;
 
   sampleTimer = timerBegin(0, 80, true);
@@ -103,31 +130,49 @@ void audio_start_recording() {
   Serial.println("Grabando (push-to-talk)...");
 }
 
-// --- Push-to-talk: detener y retornar WAV ---
+// Llamar desde loop() durante grabación para flush a SD
+void audio_flush_to_sd() {
+  if (recBufReady) {
+    memcpy(flushBuf, recBuf, REC_BUF_SAMPLES * 2);
+    recBufReady = false;
+    recFile.write((uint8_t*)flushBuf, REC_BUF_SAMPLES * 2);
+  }
+}
+
 uint8_t* audio_stop_recording(size_t* out_size) {
   timerAlarmDisable(sampleTimer);
   timerDetachInterrupt(sampleTimer);
   timerEnd(sampleTimer);
   recording = false;
 
-  uint32_t actualSamples = sampleIndex;
-  if (actualSamples < 800) {  // Menos de 0.1 seg = no vale
+  // Flush remaining samples
+  if (recBufPos > 0) {
+    recFile.write((uint8_t*)recBuf, recBufPos * 2);
+  }
+
+  uint32_t actualSamples = totalSamples;
+  if (actualSamples < 800) {
     Serial.println("Grabacion muy corta, descartando");
+    recFile.close();
     *out_size = 0;
     return nullptr;
   }
 
-  uint32_t actualDataSize = actualSamples * 2;
-  uint32_t actualTotalSize = WAV_HEADER_SIZE + actualDataSize;
+  uint32_t dataSize = actualSamples * 2;
+  uint32_t totalSize = WAV_HEADER_SIZE + dataSize;
 
-  write_wav_header(wavBuffer, actualDataSize);
+  // Escribir header WAV real
+  write_wav_header_to_file(recFile, dataSize);
+  recFile.close();
 
-  Serial.printf("WAV: %d samples, %d bytes, heap: %d\n", actualSamples, actualTotalSize, ESP.getFreeHeap());
-  *out_size = actualTotalSize;
-  return wavBuffer;
+  Serial.printf("WAV en SD: %d samples, %d bytes, heap: %d\n", actualSamples, totalSize, ESP.getFreeHeap());
+  *out_size = totalSize;
+  return (uint8_t*)1;  // Non-null = éxito, datos en SD
 }
 
 // --- Reproducción ulaw desde SD con animación ---
+#define PLAY_CHUNK_SIZE 4000
+static uint8_t playChunkBuf[PLAY_CHUNK_SIZE];
 static volatile const uint8_t* playPtr = NULL;
 static volatile uint32_t playLen = 0;
 static volatile uint32_t playPos = 0;
@@ -144,8 +189,6 @@ static void IRAM_ATTR onPlayTimer() {
 bool audio_is_playing() {
   return playPos < playLen;
 }
-
-#define PLAY_CHUNK_SIZE 8000
 
 void audio_play_mp3(const uint8_t* data, size_t size, PlaybackCallback onChunk) {
   File f = SD.open("/response.mp3", FILE_READ);
@@ -164,9 +207,9 @@ void audio_play_mp3(const uint8_t* data, size_t size, PlaybackCallback onChunk) 
     size_t toRead = audioSize - totalPlayed;
     if (toRead > PLAY_CHUNK_SIZE) toRead = PLAY_CHUNK_SIZE;
 
-    f.read(wavBuffer, toRead);
+    f.read(playChunkBuf, toRead);
 
-    playPtr = wavBuffer;
+    playPtr = playChunkBuf;
     playLen = toRead;
     playPos = 0;
 
@@ -176,7 +219,7 @@ void audio_play_mp3(const uint8_t* data, size_t size, PlaybackCallback onChunk) 
     timerAlarmEnable(playTimer);
 
     while (playPos < playLen) {
-      if (onChunk) onChunk();  // Callback para animar ojos
+      if (onChunk) onChunk();
       delay(5);
     }
 

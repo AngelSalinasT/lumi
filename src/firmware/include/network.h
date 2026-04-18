@@ -15,4 +15,8 @@ void send_emergency(const char* reason = "boton");
 // Returns: 0 = waiting_setup, 1 = onboarding, 2 = ready
 int check_device_status();
 
+// Polling de notificaciones (recordatorios de medicamentos, etc.)
+// Retorna true si hay notificación y la guarda en SD como /response.mp3
+bool check_notifications(size_t* audio_size);
+
 #endif

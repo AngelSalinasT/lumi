@@ -102,8 +102,9 @@ void loop() {
     handle_talk();
   }
 
-  // Timeout de grabacion
+  // Flush audio a SD durante grabación
   if (currentState == STATE_RECORDING) {
+    audio_flush_to_sd();
     static unsigned long lastRecBlink = 0;
     if (millis() - lastRecBlink > 500) {
       eyes.blink();
@@ -118,6 +119,27 @@ void loop() {
     handle_emergency("caida");
   }
 
+  // Polling de notificaciones cada 15 segundos
+  static unsigned long lastPoll = 0;
+  if (currentState == STATE_IDLE && millis() - lastPoll > 15000) {
+    lastPoll = millis();
+    size_t notifSize = 0;
+    if (check_notifications(&notifSize) && notifSize > 0) {
+      currentState = STATE_PLAYING;
+      eyes.setMood(DEFAULT);
+      eyes.setPosition(POS_CENTER);
+      leds_set_color(COLOR_YELLOW);
+
+      lastAudioSize = notifSize;
+      audio_play_mp3(nullptr, notifSize, updateEyesDuringPlayback);
+
+      eyes.setMood(DEFAULT);
+      eyes.setIdleMode(true, 3, 3);
+      leds_off();
+      currentState = STATE_IDLE;
+    }
+  }
+
   delay(5);
 }
 
@@ -128,9 +150,9 @@ void updateEyesDuringPlayback() {
 
 void handle_talk() {
   size_t wav_size = 0;
-  uint8_t* wav_data = audio_stop_recording(&wav_size);
+  audio_stop_recording(&wav_size);
 
-  if (!wav_data || wav_size == 0) {
+  if (wav_size == 0) {
     eyes.setMood(DEFAULT);
     eyes.setIdleMode(true);
     leds_off();
@@ -151,7 +173,7 @@ void handle_talk() {
 
   static size_t taskParams[2];
   taskParams[0] = wav_size;
-  taskParams[1] = (size_t)wav_data;
+  taskParams[1] = 0;  // Ya no se usa, datos en SD
 
   xTaskCreatePinnedToCore(httpTask, "http", 8192, taskParams, 1, NULL, 0);
 

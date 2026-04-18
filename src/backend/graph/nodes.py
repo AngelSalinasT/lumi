@@ -35,9 +35,27 @@ def _build_system_prompt(state: CompanionState) -> str:
     family = profile.get("family_contacts", [])
     interests = profile.get("interests", {})
 
-    # Fecha y hora actual
+    # Fecha y hora actual + calendario de 15 días
+    import locale
+    try:
+        locale.setlocale(locale.LC_TIME, "es_MX.UTF-8")
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_TIME, "es_ES.UTF-8")
+        except locale.Error:
+            pass
+
+    from datetime import timedelta
     now = datetime.now()
     fecha_hora = now.strftime("%H:%M del %A %d de %B de %Y")
+
+    # Calendario próximos 15 días
+    dias_semana = []
+    for i in range(15):
+        d = now + timedelta(days=i)
+        label = "HOY" if i == 0 else ("MAÑANA" if i == 1 else d.strftime("%A"))
+        dias_semana.append(f"  - {d.strftime('%d/%m')} ({label}): {d.strftime('%A').capitalize()}")
+    fecha_hora += "\n- Calendario próximos 15 días:\n" + "\n".join(dias_semana)
 
     # Medicamentos formateados
     med_text = "\n".join(

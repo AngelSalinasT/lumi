@@ -24,7 +24,7 @@ export default function WifiScreen() {
   const [connected, setConnected] = useState<boolean | null>(null);
 
   useEffect(() => {
-    getBackendIp().then(setIp);
+    setIp(getBackendIp());
   }, []);
 
   const handleTest = async () => {
@@ -80,7 +80,7 @@ export default function WifiScreen() {
             <View style={styles.ipRow}>
               <TextInput
                 style={[styles.input, { flex: 1 }]}
-                placeholder="192.168.0.14"
+                placeholder="172.20.10.3"
                 placeholderTextColor={colors.fog}
                 value={backendIp}
                 onChangeText={(v) => { setIp(v); setConnected(null); }}

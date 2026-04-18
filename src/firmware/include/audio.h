@@ -8,6 +8,7 @@ typedef void (*PlaybackCallback)();
 
 void audio_init();
 void audio_start_recording();
+void audio_flush_to_sd();
 uint8_t* audio_stop_recording(size_t* out_size);
 void audio_play_mp3(const uint8_t* data, size_t size, PlaybackCallback onChunk = nullptr);
 bool audio_is_playing();

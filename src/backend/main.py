@@ -467,6 +467,35 @@ async def send_push_notification(device_id: str, title: str, body: str):
         logger.error("Error enviando push: %s", e)
 
 
+@app.post("/debug/trigger-reminder/{device_id}")
+async def debug_trigger_reminder(device_id: str, med_name: str = "Metformina"):
+    """DEBUG: Fuerza un recordatorio de medicamento."""
+    from services.medications import add_pending_notification
+    profile = await get_user_profile(device_id)
+    user_name = profile.get("name", "amigo")
+    meds = profile.get("medications", [])
+    med = next((m for m in meds if m["name"].lower() == med_name.lower()), None)
+    dose = med.get("dose", "") if med else ""
+
+    text = f"¡{user_name}! Es hora de tu {med_name}"
+    if dose:
+        text += f", {dose}"
+    text += ". No se te olvide, es importante para tu salud."
+
+    from services.tts import text_to_speech
+    audio = await text_to_speech(text)
+    add_pending_notification(device_id, text, audio, "medication_reminder")
+    return {"status": "ok", "text": text, "audio_bytes": len(audio)}
+
+
+@app.post("/debug/trigger-proactive/{device_id}")
+async def debug_trigger_proactive(device_id: str):
+    """DEBUG: Fuerza una conversación proactiva de Lumi."""
+    from services.proactive import generate_proactive_message
+    result = await generate_proactive_message(device_id)
+    return result
+
+
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
